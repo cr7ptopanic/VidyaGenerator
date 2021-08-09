@@ -32,6 +32,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
         token = ERC20(_LP);
         vault = Vault(_vault);
+        commitmentInfo.push();
         admin = msg.sender;     
         
     }
@@ -48,7 +49,20 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         uint256 lastCollection;
 
     }
-    
+    struct Commitment{    
+        uint256 bonus;
+        uint256 duration;
+        uint256 penalty;
+        uint256 deciAdjustment;
+        bool isActive;
+    }
+    struct ProviderCommited{
+        
+        uint256 amount;
+        uint256 commitIndex;
+        uint256 unlock;     
+        
+    }
 
     uint256 totalLP;
     uint256 totalWeight;
@@ -58,14 +72,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
     
     Commitment[] commitmentInfo;
     
-    struct Commitment{
-    
-        uint256 bonus;
-        uint256 duration;
-        uint256 penalty;
-        uint256 deciAdjustment;
-        
-    }
+
 
 
     modifier isOpen(){
@@ -103,6 +110,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         _holder.duration = time;
         _holder.penalty = _penalty;
         _holder.deciAdjustment = _deciAdjustment;
+        _holder.isActive = true;
         commitmentInfo.push(_holder);
         
         emit newCommitment(_bonus, time, _penalty, _deciAdjustment);
@@ -110,8 +118,8 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
     //provider functions
 
-    function depositLP(uint256 _amount) external isOpen {
-
+    function depositLP(uint256 _amount, uint256 _commitmentIndex) external isOpen {
+        require(_commitmentIndex < commitmentInfo.length, "Commitment out of range");
         require(token.balanceOf(msg.sender) >= _amount, "Not enought LP");
         require(token.transferFrom(msg.sender, address(this), _amount), "LP not transferred");
         Provider storage user = providerInfo[msg.sender];
@@ -125,8 +133,20 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         provider[msg.sender] = true;
 
         emit deposit(msg.sender, _amount);
-
-
+        if(commitIndex != 0){
+            commit(_commitmetIndex, _amount);
+            }
+    }
+    
+    function commit(uint256 _commitmentIndex, uint256 _amount) internal{
+               
+        Commitment memory _current = commitmentInfo[_commitmentIndex];
+        if(current.isActive){
+            
+        
+        }
+    
+    
     }
 
     function claimExternal() external isOpen isProvider {
