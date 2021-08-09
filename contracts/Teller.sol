@@ -32,13 +32,13 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
         token = ERC20(_LP);
         vault = Vault(_vault);
-        admin = msg.sender;
-
+        admin = msg.sender;     
+        
     }
 
     event deposit(address sender, uint256 amount);
     event withdraw(address receiver, uint256 amount);
-
+    event newCommitment(uint256 bonus, uint256 time, uint256 penalty, uint256 deciAdjustment);
 
 
     struct Provider{
@@ -48,12 +48,25 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         uint256 lastCollection;
 
     }
+    
 
     uint256 totalLP;
     uint256 totalWeight;
     mapping(address=>Provider) providerInfo;
     mapping(address=> bool) provider;
     bool open;
+    
+    Commitment[] commitmentInfo;
+    
+    struct Commitment{
+    
+        uint256 bonus;
+        uint256 duration;
+        uint256 penalty;
+        uint256 deciAdjustment;
+        
+    }
+
 
     modifier isOpen(){
 
@@ -77,10 +90,22 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
     //admin functions
 
-    function toggleTeller() private isAdmin {
+    function toggleTeller() external isAdmin {
 
         open = !open; 
 
+    }
+    
+    function addCommitment(uint256 _bonus, uint256 _days, unit256 _penalty, uint256 _deciAdjustment) external isAdmin{
+        Commitment memory _holder;
+        uint256 time = _days days
+        _holder.bonus = _bonus;
+        _holder.duration = time;
+        _holder.penalty = _penalty;
+        _holder.deciAdjustment = _deciAdjustment;
+        commitmentInfo.push(_holder);
+        
+        emit newCommitment(_bonus, time, _penalty, _deciAdjustment);
     }
 
     //provider functions
@@ -100,6 +125,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         provider[msg.sender] = true;
 
         emit deposit(msg.sender, _amount);
+
 
     }
 
