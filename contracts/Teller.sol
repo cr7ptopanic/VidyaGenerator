@@ -47,6 +47,8 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         uint256 userWeight;
         uint256 committedAmount;
         uint256 lastCollection;
+        uint256 commitmentStart;
+        uint256 commitmentIndex;
 
     }
     struct Commitment{    
@@ -55,13 +57,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         uint256 penalty;
         uint256 deciAdjustment;
         bool isActive;
-    }
-    struct ProviderCommited{
-        
-        uint256 amount;
-        uint256 commitIndex;
-        uint256 unlock;     
-        
     }
 
     uint256 totalLP;
