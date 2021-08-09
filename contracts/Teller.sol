@@ -96,7 +96,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
     }
     
-    function addCommitment(uint256 _bonus, uint256 _days, unit256 _penalty, uint256 _deciAdjustment) external isAdmin{
+    function addCommitment(uint256 _bonus, uint256 _days, uint256 _penalty, uint256 _deciAdjustment) external isAdmin{
         Commitment memory _holder;
         uint256 time = _days days;
         _holder.bonus = _bonus;
