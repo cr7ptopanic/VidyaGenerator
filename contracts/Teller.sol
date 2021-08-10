@@ -32,13 +32,14 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
         token = ERC20(_LP);
         vault = Vault(_vault);
-        admin = msg.sender;
-
+        commitmentInfo.push();
+        admin = msg.sender;     
+        
     }
 
     event deposit(address sender, uint256 amount);
     event withdraw(address receiver, uint256 amount);
-
+    event newCommitment(uint256 bonus, uint256 time, uint256 penalty, uint256 deciAdjustment);
 
 
     struct Provider{
@@ -46,7 +47,16 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         uint256 userWeight;
         uint256 committedAmount;
         uint256 lastCollection;
+        uint256 commitmentStart;
+        uint256 commitmentIndex;
 
+    }
+    struct Commitment{    
+        uint256 bonus;
+        uint256 duration;
+        uint256 penalty;
+        uint256 deciAdjustment;
+        bool isActive;
     }
 
     uint256 totalLP;
@@ -54,6 +64,11 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
     mapping(address=>Provider) providerInfo;
     mapping(address=> bool) provider;
     bool open;
+    
+    Commitment[] commitmentInfo;
+    
+
+
 
     modifier isOpen(){
 
@@ -77,16 +92,29 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
     //admin functions
 
-    function toggleTeller() private isAdmin {
+    function toggleTeller() external isAdmin {
 
         open = !open; 
 
     }
+    
+    function addCommitment(uint256 _bonus, uint256 _days, uint256 _penalty, uint256 _deciAdjustment) external isAdmin{
+        Commitment memory _holder;
+        uint256 time = _days days;
+        _holder.bonus = _bonus;
+        _holder.duration = time;
+        _holder.penalty = _penalty;
+        _holder.deciAdjustment = _deciAdjustment;
+        _holder.isActive = true;
+        commitmentInfo.push(_holder);
+        
+        emit newCommitment(_bonus, time, _penalty, _deciAdjustment);
+    }
 
     //provider functions
 
-    function depositLP(uint256 _amount) external isOpen {
-
+    function depositLP(uint256 _amount, uint256 _commitmentIndex) external isOpen {
+        require(_commitmentIndex < commitmentInfo.length, "Commitment out of range");
         require(token.balanceOf(msg.sender) >= _amount, "Not enought LP");
         require(token.transferFrom(msg.sender, address(this), _amount), "LP not transferred");
         Provider storage user = providerInfo[msg.sender];
@@ -100,7 +128,20 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
         provider[msg.sender] = true;
 
         emit deposit(msg.sender, _amount);
-
+        if(commitIndex != 0){
+            commit(_commitmetIndex, _amount);
+            }
+    }
+    
+    function commit(uint256 _commitmentIndex, uint256 _amount) internal{
+               
+        Commitment memory _current = commitmentInfo[_commitmentIndex];
+        if(current.isActive){
+            
+        
+        }
+    
+    
     }
 
     function claimExternal() external isOpen isProvider {
