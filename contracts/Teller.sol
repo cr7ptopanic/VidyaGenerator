@@ -177,7 +177,7 @@ contract Teller is Ownable, ReentrancyGuard {
         user.LPdeposited -= _amount;
 
         if (user.LPdeposited == 0) {
-            provider[msg.sender] == false;
+            provider[msg.sender] = false;
         }
 
         uint256 balance = LpToken.balanceOf(address(this));
