@@ -1,27 +1,23 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import "./interfaces/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 /**
-    Vault Functionality:
-    - Receives Vidya from fees and wagers with in the ecosystem
-    - The vault calculates the current reward given per block minined on the net
-    - The vault receives from the teller the user control of the system 
-*/
-contract Vault {
-    address public vidya = address(0x3D3D35bb9bEC23b06Ca00fe472b50E7A4c692C30);
-    address private admin;
-    IERC20 token = IERC20(vidya);
-
-    constructor() {
-        admin = msg.sender;
-    }
+ * @title Vault Contract
+ */
+contract Vault is Ownable {
+    using Address for address;
 
     event tellerAdded(address _teller, uint256 _priority);
     event tellerPriorityChanged(address _teller, uint256 _priority);
     event rateChange(uint256 _rate);
     event rewards(address _provider, uint256 _amount);
+
+    IERC20 Vidya;
 
     mapping(address => bool) teller;
     mapping(address => uint256) tellerPriority;
@@ -32,19 +28,22 @@ contract Vault {
     uint256 rate;
     uint256 nextRateChange;
 
-    modifier isAdmin() {
-        require(admin == msg.sender, "Vault: Admin only function");
-        _;
-    }
-
     modifier isTeller() {
         require(teller[msg.sender], "Vault: Teller only function");
         _;
     }
 
+    /**
+     * @dev Constructor function
+     * @param _Vidya Interface of Vidya 0x3D3D35bb9bEC23b06Ca00fe472b50E7A4c692C30
+     */
+    constructor(IERC20 _Vidya) {
+        Vidya = _Vidya;
+    }
+
     // admin functions
 
-    function addTeller(address _teller, uint256 _priority) external isAdmin {
+    function addTeller(address _teller, uint256 _priority) external onlyOwner {
         require(teller[_teller] == false, "Vault: Already a teller");
         require(_priority > 0, "Vault: Priority not greater then 0");
 
@@ -58,7 +57,7 @@ contract Vault {
 
     function changePriority(address _teller, uint256 _newPriority)
         external
-        isAdmin
+        onlyOwner
     {
         require(teller[_teller], "Vault: Not a Teller");
         require(
@@ -78,7 +77,7 @@ contract Vault {
     //Vault Functions internal
 
     function calculateRate() internal {
-        rate = token.balanceOf(address(this)) / 26 weeks; //roughly 6 months
+        rate = Vidya.balanceOf(address(this)) / 26 weeks; //roughly 6 months
         nextRateChange = block.timestamp + 1 weeks;
 
         emit rateChange(rate);
@@ -100,7 +99,7 @@ contract Vault {
             calculateRate();
         }
 
-        token.transferTo(_provider, _amount);
+        Vidya.transfer(_provider, _amount);
 
         emit rewards(_provider, _amount);
     }
