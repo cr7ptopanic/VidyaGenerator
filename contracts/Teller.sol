@@ -18,7 +18,7 @@ contract Teller is Ownable, ReentrancyGuard {
 
     event deposit(address sender, uint256 amount);
     event withdrawed(address receiver, uint256 amount);
-    event newCommitment(
+    event newCommitmentAdded(
         uint256 bonus,
         uint256 time,
         uint256 penalty,
@@ -52,8 +52,10 @@ contract Teller is Ownable, ReentrancyGuard {
     uint256 totalLP;
     uint256 totalWeight;
     uint256 closeTime;
+
     mapping(address => Provider) providerInfo;
     mapping(address => bool) provider;
+
     bool open;
     address dev;
     bool purpose;
@@ -66,7 +68,7 @@ contract Teller is Ownable, ReentrancyGuard {
     }
 
     modifier isProvider() {
-        require(provider[msg.sender], "Teller: Not Provider");
+        require(provider[msg.sender], "Teller: Caller is not the provider.");
         _;
     }
 
@@ -83,37 +85,48 @@ contract Teller is Ownable, ReentrancyGuard {
         emit TellerDeployed();
     }
 
-    //admin functions
-
+    /**
+     * @dev External function to toggle the teller. This function can be called by only owner.
+     */
     function toggleTeller() external onlyOwner {
         open = !open;
         closeTime = block.timestamp;
+
         emit tellerToggled(address(this), open);
     }
 
+    /**
+     * @dev External function to add the commitment. This function can be called by only owner.
+     * @param _bonus Amount of bonus
+     * @param _days Days of duration
+     * @param _penalty Number of penalty
+     * @param _deciAdjustment Adjustment amount
+     */
     function addCommitment(
         uint256 _bonus,
         uint256 _days,
         uint256 _penalty,
         uint256 _deciAdjustment
     ) external onlyOwner {
-        Commitment memory _holder;
-        uint256 time = _days * 1 days;
-        _holder.bonus = _bonus;
-        _holder.duration = time;
-        _holder.penalty = _penalty;
-        _holder.deciAdjustment = _deciAdjustment;
-        _holder.isActive = true;
-        commitmentInfo.push(_holder);
+        Commitment memory holder;
 
-        emit newCommitment(_bonus, time, _penalty, _deciAdjustment);
+        holder.bonus = _bonus;
+        holder.duration = _days * 1 days;
+        holder.penalty = _penalty;
+        holder.deciAdjustment = _deciAdjustment;
+        holder.isActive = true;
+
+        commitmentInfo.push(holder);
+
+        emit newCommitmentAdded(_bonus, _days, _penalty, _deciAdjustment);
     }
 
     function toggleCommitment(uint256 _index) external onlyOwner {
         require(
-            _index <= commitmentInfo.length && _index > 0,
-            "Teller: Not within bounds."
+            0 < _index && _index <= commitmentInfo.length,
+            "Teller: Current index is not listed in the commitment array."
         );
+
         commitmentInfo[_index].isActive = !commitmentInfo[_index].isActive;
 
         emit commitmentToggle(_index, commitmentInfo[_index].isActive);
@@ -122,17 +135,15 @@ contract Teller is Ownable, ReentrancyGuard {
     function setPurpose(address _address) external onlyOwner {
         purpose = true;
         dev = _address;
+
         emit purposeSet(dev);
     }
 
     //provider functions
 
     function depositLP(uint256 _amount) external isOpen {
-        require(LpToken.balanceOf(msg.sender) >= _amount, "Teller: Not enought LP"); //could we forget this one since the next one would return false if not transferred?
-        require(
-            LpToken.transferFrom(msg.sender, address(this), _amount),
-            "Teller: LP not transferred"
-        );
+        LpToken.transferFrom(msg.sender, address(this), _amount);
+
         Provider storage user = providerInfo[msg.sender];
         if (provider[msg.sender]) {
             claim();
@@ -162,17 +173,21 @@ contract Teller is Ownable, ReentrancyGuard {
         user.userWeight =
             user.userWeight -
             ((_amount * user.userWeight) / user.LPdeposited);
-        user.LPdeposited = user.LPdeposited + _amount;
+
+        user.LPdeposited -= _amount;
+
         if (user.LPdeposited == 0) {
             provider[msg.sender] == false;
         }
+
         uint256 balance = LpToken.balanceOf(address(this));
         uint256 send = _amount;
+
         if (totalLP < balance) {
             send = (_amount * balance) / totalLP;
         }
 
-        totalLP = totalLP - send;
+        totalLP -= send;
         LpToken.transfer(msg.sender, send);
 
         emit withdrawed(msg.sender, send);
@@ -187,13 +202,17 @@ contract Teller is Ownable, ReentrancyGuard {
             commitmentInfo[_commitmentIndex].isActive,
             "Teller: Is not a valid commitment"
         );
+
         Provider storage user = providerInfo[msg.sender];
+
         require(
             user.LPdeposited - user.committedAmount >= _amount,
             "Teller: Not enough tokens deposited"
         );
+
         uint256 bonusCredit = commitBonus(_commitmentIndex, _amount);
         uint256 newEnd;
+
         if (user.commitmentEnds > block.timestamp) {
             require(
                 _commitmentIndex == user.commitmentIndex,
@@ -206,7 +225,6 @@ contract Teller is Ownable, ReentrancyGuard {
                 _commitmentIndex
             );
         } else {
-            user.commitmentIndex;
             newEnd =
                 block.timestamp +
                 commitmentInfo[_commitmentIndex].duration;
@@ -223,16 +241,22 @@ contract Teller is Ownable, ReentrancyGuard {
     function breakCommitment() external nonReentrant isProvider {
         Provider storage user = providerInfo[msg.sender];
         Provider storage blank;
+
         require(
             user.commitmentEnds > block.timestamp,
             "Teller: No commitment to break."
         );
+
         uint256 tokenToReceive = user.LPdeposited;
+
         Commitment memory _current = commitmentInfo[user.commitmentIndex];
+
         uint256 fee = (tokenToReceive * _current.penalty) /
             _current.deciAdjustment;
+
         tokenToReceive = tokenToReceive - fee;
-        totalWeight = totalWeight - user.userWeight;
+
+        totalWeight -= user.userWeight;
 
         user = blank;
 
@@ -251,19 +275,24 @@ contract Teller is Ownable, ReentrancyGuard {
     function claim() internal {
         Provider memory user = providerInfo[msg.sender];
         uint256 _timeGap = block.timestamp - user.lastCollection;
+
         if (!open) {
             _timeGap = closeTime - user.lastCollection;
         }
+
         if (_timeGap > 365 * 1 days) {
             _timeGap = 365 * 1 days;
         }
-        uint256 _weightTime = _timeGap * user.userWeight;
+
+        uint256 timeWeight = _timeGap * user.userWeight;
+
         providerInfo[msg.sender].lastCollection = block.timestamp;
-        Vault.payProvider(msg.sender, _weightTime, totalWeight);
+
+        Vault.payProvider(msg.sender, timeWeight, totalWeight);
     }
 
     function commitBonus(uint256 _commitmentIndex, uint256 _amount)
-        internal
+        private
         view
         returns (uint256)
     {

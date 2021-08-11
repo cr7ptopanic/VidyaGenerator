@@ -12,10 +12,20 @@ import "@openzeppelin/contracts/utils/Address.sol";
 contract Vault is Ownable {
     using Address for address;
 
-    event tellerAdded(address _teller, uint256 _priority);
-    event tellerPriorityChanged(address _teller, uint256 _priority);
-    event rateChange(uint256 _rate);
-    event rewards(address _provider, uint256 _amount);
+    /// @notice Event emitted only on construction.
+    event VaultDeployed();
+
+    /// @notice Event emitted when new teller added to vault.
+    event NewTellerAdded(address newTeller, uint256 priority);
+
+    /// @notice Event emitted when current priority changed.
+    event TellerPriorityChanged(address teller, uint256 newPriority);
+
+    /// @notice Event emitted when pay vidya token to provider.
+    event ProviderPaid(address provider, uint256 vidyaAmount);
+
+    /// @notice Event emitted when vidya token rate calculated.
+    event VidyaRateCalculated(uint256 vidyaRate);
 
     IERC20 Vidya;
 
@@ -24,45 +34,54 @@ contract Vault is Ownable {
     mapping(address => uint256) priorityFreeze;
 
     uint256 totalPriority;
+    uint256 vidyaRate;
+    uint256 timeToCalculateRate;
 
-    uint256 rate;
-    uint256 nextRateChange;
-
-    modifier isTeller() {
-        require(teller[msg.sender], "Vault: Teller only function");
+    modifier onlyTeller() {
+        require(teller[msg.sender], "Vault: Caller is not the teller.");
         _;
     }
 
     /**
      * @dev Constructor function
-     * @param _Vidya Interface of Vidya 0x3D3D35bb9bEC23b06Ca00fe472b50E7A4c692C30
+     * @param _Vidya Interface of Vidya token => 0x3D3D35bb9bEC23b06Ca00fe472b50E7A4c692C30
      */
     constructor(IERC20 _Vidya) {
         Vidya = _Vidya;
+
+        emit VaultDeployed();
     }
 
-    // admin functions
-
+    /**
+     * @dev External function to add the teller. This function can be called by only owner.
+     * @param _teller Address of teller
+     * @param _priority Priority of teller
+     */
     function addTeller(address _teller, uint256 _priority) external onlyOwner {
-        require(teller[_teller] == false, "Vault: Already a teller");
-        require(_priority > 0, "Vault: Priority not greater then 0");
+        require(teller[_teller] == false, "Vault: Caller is a teller already.");
+        require(_priority > 0, "Vault: Priority should be more than zero.");
 
         teller[_teller] = true;
         tellerPriority[_teller] = _priority;
         totalPriority += _priority;
         priorityFreeze[_teller] = block.timestamp + 7 days;
 
-        emit tellerAdded(_teller, _priority);
+        emit NewTellerAdded(_teller, _priority);
     }
 
+    /**
+     * @dev External function to change the priority of teller. This function can be called by only owner.
+     * @param _teller Address of teller
+     * @param _newPriority New priority of teller
+     */
     function changePriority(address _teller, uint256 _newPriority)
         external
         onlyOwner
     {
-        require(teller[_teller], "Vault: Not a Teller");
+        require(teller[_teller], "Vault: Caller is not the teller.");
         require(
             priorityFreeze[_teller] <= block.timestamp,
-            "Vault: To soon to change Priority."
+            "Vault: Time to change the priority is overflown."
         );
 
         uint256 _oldPriority = tellerPriority[_teller];
@@ -71,36 +90,44 @@ contract Vault is Ownable {
 
         priorityFreeze[_teller] = block.timestamp + 1 weeks;
 
-        emit tellerPriorityChanged(_teller, _newPriority);
+        emit TellerPriorityChanged(_teller, _newPriority);
     }
 
-    //Vault Functions internal
-
-    function calculateRate() internal {
-        rate = Vidya.balanceOf(address(this)) / 26 weeks; //roughly 6 months
-        nextRateChange = block.timestamp + 1 weeks;
-
-        emit rateChange(rate);
-    }
-
-    //teller functions
-
+    /**
+     * @dev External function to pay the Vidya token to investors. This function can be called by only teller.
+     * @param _provider Address of provider
+     * @param _providerTimeWeight Weight time of provider
+     * @param _totalWeight Sum of provider weight
+     */
     function payProvider(
         address _provider,
-        uint256 _providerWeightTime,
+        uint256 _providerTimeWeight,
         uint256 _totalWeight
-    ) external isTeller {
-        uint256 _numerator = rate *
-            _providerWeightTime *
+    ) external onlyTeller {
+        uint256 _numerator = vidyaRate *
+            _providerTimeWeight *
             tellerPriority[msg.sender];
+
         uint256 _demonator = _totalWeight * totalPriority;
+
         uint256 _amount = _numerator / _demonator;
-        if (nextRateChange <= block.timestamp) {
+
+        if (timeToCalculateRate <= block.timestamp) {
             calculateRate();
         }
 
         Vidya.transfer(_provider, _amount);
 
-        emit rewards(_provider, _amount);
+        emit ProviderPaid(_provider, _amount);
+    }
+
+    /**
+     * @dev Private function to calculate the Vidya Rate.
+     */
+    function calculateRate() private {
+        vidyaRate = Vidya.balanceOf(address(this)) / 26 weeks; // 6 months
+        timeToCalculateRate = block.timestamp + 1 weeks;
+
+        emit VidyaRateCalculated(vidyaRate);
     }
 }
