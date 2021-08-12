@@ -16,19 +16,37 @@ contract Teller is Ownable, ReentrancyGuard {
     /// @notice Event emitted only on construction.
     event TellerDeployed();
 
-    event deposit(address sender, uint256 amount);
-    event withdrawed(address receiver, uint256 amount);
-    event newCommitmentAdded(
+    /// @notice Event emitted when teller toggled.
+    event TellerToggled(address teller, bool status);
+
+    /// @notice Event emitted when new commitment added.
+    event NewCommitmentAdded(
         uint256 bonus,
         uint256 time,
         uint256 penalty,
         uint256 deciAdjustment
     );
-    event commitmentLives(address sender, uint256 commitedAmount);
-    event commitmentBroken(address sender, uint256 tokenSent);
-    event tellerToggled(address teller, bool status);
-    event commitmentToggle(uint256 index, bool status);
-    event purposeSet(address location);
+
+    /// @notice Event emitted when commitment toggled.
+    event CommitmentToggled(uint256 index, bool status);
+
+    /// @notice Event emitted when owner set the dev address to get the break commitment fees.
+    event PurposeSet(address devAddress);
+
+    /// @notice Event emitted when provider deposit the lp tokens.
+    event LpDeposited(address provider, uint256 amount);
+
+    /// @notice Event emitted when provider withdrew the lp tokens.
+    event Withdrew(address provider, uint256 amount);
+    
+    /// @notice Event emitted when provider commit the lp tokens.
+    event Commited(address provider, uint256 commitedAmount);
+
+    /// @notice Event emitted when provider break the commitment.
+    event CommitmentBroke(address provider, uint256 tokenSentAmount);
+
+    /// @notice Event emitted when provider claimed.
+    event Claimed(address provider, bool success);
 
     IVault Vault;
     IERC20 LpToken;
@@ -37,7 +55,7 @@ contract Teller is Ownable, ReentrancyGuard {
         uint256 LPdeposited;
         uint256 userWeight;
         uint256 committedAmount;
-        uint256 lastCollection;
+        uint256 lastClaimedTime;
         uint256 commitmentEnds;
         uint256 commitmentIndex;
     }
@@ -57,13 +75,13 @@ contract Teller is Ownable, ReentrancyGuard {
     mapping(address => bool) provider;
 
     bool open;
-    address dev;
+    address devAddress;
     bool purpose;
 
     Commitment[] commitmentInfo;
 
-    modifier isOpen() {
-        require(open, "Teller: Teller is not open");
+    modifier isTellerOpen() {
+        require(open, "Teller: Teller is not opened.");
         _;
     }
 
@@ -92,7 +110,7 @@ contract Teller is Ownable, ReentrancyGuard {
         open = !open;
         closeTime = block.timestamp;
 
-        emit tellerToggled(address(this), open);
+        emit TellerToggled(address(this), open);
     }
 
     /**
@@ -118,9 +136,13 @@ contract Teller is Ownable, ReentrancyGuard {
 
         commitmentInfo.push(holder);
 
-        emit newCommitmentAdded(_bonus, _days, _penalty, _deciAdjustment);
+        emit NewCommitmentAdded(_bonus, _days, _penalty, _deciAdjustment);
     }
 
+    /**
+     * @dev External function to toggle the commitment. This function can be called by only owner.
+     * @param _index Commitment index
+     */
     function toggleCommitment(uint256 _index) external onlyOwner {
         require(
             0 < _index && _index <= commitmentInfo.length,
@@ -129,39 +151,45 @@ contract Teller is Ownable, ReentrancyGuard {
 
         commitmentInfo[_index].isActive = !commitmentInfo[_index].isActive;
 
-        emit commitmentToggle(_index, commitmentInfo[_index].isActive);
+        emit CommitmentToggled(_index, commitmentInfo[_index].isActive);
     }
 
+    /**
+     * @dev External function to set the dev address to give that address the break commitment fees. This function can be called by only owner.
+     * @param _address Dev address
+     */
     function setPurpose(address _address) external onlyOwner {
         purpose = true;
-        dev = _address;
+        devAddress = _address;
 
-        emit purposeSet(dev);
+        emit PurposeSet(devAddress);
     }
 
-    //provider functions
-
-    function depositLP(uint256 _amount) external isOpen {
+    /**
+     * @dev External function to deposit lp token from providers. Teller must be open.
+     * @param _amount LP token amount
+     */
+    function depositLP(uint256 _amount) external isTellerOpen {
         LpToken.transferFrom(msg.sender, address(this), _amount);
 
         Provider storage user = providerInfo[msg.sender];
         if (provider[msg.sender]) {
             claim();
         } else {
-            user.lastCollection = block.timestamp;
+            user.lastClaimedTime = block.timestamp;
         }
         user.LPdeposited += _amount;
         user.userWeight += _amount;
         totalLP += _amount;
         provider[msg.sender] = true;
 
-        emit deposit(msg.sender, _amount);
+        emit LpDeposited(msg.sender, _amount);
     }
 
-    function claimExternal() external isOpen isProvider {
-        claim();
-    }
-
+    /**
+     * @dev External function to withdraw lp token from providers. This function can be called by only provider.
+     * @param _amount LP token amount
+     */
     function withdraw(uint256 _amount) external isProvider {
         Provider storage user = providerInfo[msg.sender];
         require(
@@ -170,9 +198,7 @@ contract Teller is Ownable, ReentrancyGuard {
         );
         claim();
 
-        user.userWeight =
-            user.userWeight -
-            ((_amount * user.userWeight) / user.LPdeposited);
+        user.userWeight -= ((_amount * user.userWeight) / user.LPdeposited);
 
         user.LPdeposited -= _amount;
 
@@ -190,9 +216,14 @@ contract Teller is Ownable, ReentrancyGuard {
         totalLP -= send;
         LpToken.transfer(msg.sender, send);
 
-        emit withdrawed(msg.sender, send);
+        emit Withdrew(msg.sender, send);
     }
 
+    /**
+     * @dev External function to commit lp token to gain a minor advantise for a selected amount of time. This function can be called by only provider.
+     * @param _amount LP token amount
+     * @param _commitmentIndex Index of commitment array
+     */
     function commit(uint256 _amount, uint256 _commitmentIndex)
         external
         nonReentrant
@@ -235,9 +266,12 @@ contract Teller is Ownable, ReentrancyGuard {
         user.userWeight += bonusCredit;
         totalWeight += bonusCredit;
 
-        emit commitmentLives(msg.sender, _amount);
+        emit Commited(msg.sender, _amount);
     }
 
+    /**
+     * @dev External function to break the commitment. This function can be called by only provider.
+     */
     function breakCommitment() external nonReentrant isProvider {
         Provider storage user = providerInfo[msg.sender];
         Provider storage blank;
@@ -254,8 +288,8 @@ contract Teller is Ownable, ReentrancyGuard {
         uint256 fee = (tokenToReceive * _current.penalty) /
             _current.deciAdjustment;
 
-        tokenToReceive = tokenToReceive - fee;
-        
+        tokenToReceive -= fee;
+
         totalLP -= tokenToReceive;
 
         totalWeight -= user.userWeight;
@@ -263,23 +297,23 @@ contract Teller is Ownable, ReentrancyGuard {
         user = blank;
 
         if (purpose) {
-            uint256 devFee = fee / 10;
-            LpToken.transfer(dev, devFee);
+            LpToken.transfer(devAddress, fee / 10);
         }
 
         LpToken.transfer(msg.sender, tokenToReceive);
 
-        emit commitmentBroken(msg.sender, tokenToReceive);
+        emit CommitmentBroke(msg.sender, tokenToReceive);
     }
 
-    //internal functions
-
-    function claim() internal {
+    /**
+     * @dev External function to claim the vidya token. This function can be called by only provider and teller must be opened.
+     */
+    function claim() external isProvider isTellerOpen nonReentrant {
         Provider memory user = providerInfo[msg.sender];
-        uint256 _timeGap = block.timestamp - user.lastCollection;
+        uint256 _timeGap = block.timestamp - user.lastClaimedTime;
 
         if (!open) {
-            _timeGap = closeTime - user.lastCollection;
+            _timeGap = closeTime - user.lastClaimedTime;
         }
 
         if (_timeGap > 365 * 1 days) {
@@ -288,11 +322,16 @@ contract Teller is Ownable, ReentrancyGuard {
 
         uint256 timeWeight = _timeGap * user.userWeight;
 
-        providerInfo[msg.sender].lastCollection = block.timestamp;
+        providerInfo[msg.sender].lastClaimedTime = block.timestamp;
 
         Vault.payProvider(msg.sender, timeWeight, totalWeight);
+
+        emit Claimed(msg.sender, true);
     }
 
+    /**
+     * @dev Private function to return commit bonus.
+     */
     function commitBonus(uint256 _commitmentIndex, uint256 _amount)
         private
         view
@@ -306,12 +345,15 @@ contract Teller is Ownable, ReentrancyGuard {
         return 0;
     }
 
+    /**
+     * @dev External function to calim the vidya token. This function can be called by only provider and teller must be opened.
+     */
     function addToCommitment(
         uint256 _oldAmount,
         uint256 _extraAmount,
         uint256 _oldEnd,
         uint256 _commitmentIndex
-    ) internal returns (uint256) {
+    ) private returns (uint256) {
         uint256 _placeHolder = commitmentInfo[_commitmentIndex].duration +
             block.timestamp;
         uint256 newEnd = ((_oldAmount * _oldEnd) +

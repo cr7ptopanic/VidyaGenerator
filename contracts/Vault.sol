@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
 /**
@@ -58,6 +57,10 @@ contract Vault is Ownable {
      * @param _priority Priority of teller
      */
     function addTeller(address _teller, uint256 _priority) external onlyOwner {
+        require(
+            _teller.isContract() == true,
+            "Vault: Address is not the contract address."
+        );
         require(teller[_teller] == false, "Vault: Caller is a teller already.");
         require(_priority > 0, "Vault: Priority should be more than zero.");
 
@@ -78,6 +81,10 @@ contract Vault is Ownable {
         external
         onlyOwner
     {
+        require(
+            _teller.isContract() == true,
+            "Vault: Address is not the contract address."
+        );
         require(teller[_teller], "Vault: Caller is not the teller.");
         require(
             priorityFreeze[_teller] <= block.timestamp,
@@ -104,21 +111,21 @@ contract Vault is Ownable {
         uint256 _providerTimeWeight,
         uint256 _totalWeight
     ) external onlyTeller {
-        uint256 _numerator = vidyaRate *
+        uint256 numerator = vidyaRate *
             _providerTimeWeight *
             tellerPriority[msg.sender];
 
-        uint256 _demonator = _totalWeight * totalPriority;
+        uint256 denominator = _totalWeight * totalPriority;
 
-        uint256 _amount = _numerator / _demonator;
+        uint256 amount = numerator / denominator;
 
         if (timeToCalculateRate <= block.timestamp) {
             calculateRate();
         }
 
-        Vidya.transfer(_provider, _amount);
+        Vidya.transfer(_provider, amount);
 
-        emit ProviderPaid(_provider, _amount);
+        emit ProviderPaid(_provider, amount);
     }
 
     /**
