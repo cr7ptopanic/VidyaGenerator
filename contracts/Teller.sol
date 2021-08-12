@@ -255,6 +255,8 @@ contract Teller is Ownable, ReentrancyGuard {
             _current.deciAdjustment;
 
         tokenToReceive = tokenToReceive - fee;
+        
+        totalLP -= tokenToReceive;
 
         totalWeight -= user.userWeight;
 
