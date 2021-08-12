@@ -283,6 +283,7 @@ contract Teller is Ownable, ReentrancyGuard {
 
         uint256 tokenToReceive = user.LPdeposited;
 
+
         Commitment memory _current = commitmentInfo[user.commitmentIndex];
 
         uint256 fee = (tokenToReceive * _current.penalty) /
@@ -290,7 +291,7 @@ contract Teller is Ownable, ReentrancyGuard {
 
         tokenToReceive -= fee;
 
-        totalLP -= tokenToReceive;
+        totalLP -= user.LPdeposited;
 
         totalWeight -= user.userWeight;
 
