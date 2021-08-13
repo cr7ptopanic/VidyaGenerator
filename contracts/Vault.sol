@@ -148,7 +148,5 @@ contract Vault is Ownable, ReentrancyGuard {
             "Vault: Not time to adjust."
         );
         calculateRate();
-
-        emit VidyaRateCalculated(vidyaRate);
     }
 }
