@@ -30,4 +30,9 @@ interface IVault {
         uint256 providerTimeWeight,
         uint256 totalWeight
     ) external;
+
+    /**
+     * @dev External function to calculate the Vidya Rate.
+     */
+    function calculateRateExternal() external;
 }

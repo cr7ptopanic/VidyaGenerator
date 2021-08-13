@@ -54,11 +54,12 @@ contract Teller is Ownable, ReentrancyGuard {
     struct Provider {
         uint256 LPdeposited;
         uint256 userWeight;
-        uint256 committedAmount;
         uint256 lastClaimedTime;
-        uint256 commitmentEndTime;
         uint256 commitmentIndex;
+        uint256 committedAmount;
+        uint256 commitmentEndTime;
     }
+
     struct Commitment {
         uint256 bonus;
         uint256 duration;
@@ -69,19 +70,19 @@ contract Teller is Ownable, ReentrancyGuard {
 
     uint256 totalLP;
     uint256 totalWeight;
-    uint256 closeTime;
+    uint256 tellerClosedTime;
 
     mapping(address => Provider) providerInfo;
     mapping(address => bool) provider;
 
-    bool open;
+    bool tellerOpen;
     address devAddress;
     bool purpose;
 
     Commitment[] commitmentInfo;
 
     modifier isTellerOpen() {
-        require(open, "Teller: Teller is not opened.");
+        require(tellerOpen, "Teller: Teller is not opened.");
         _;
     }
 
@@ -107,10 +108,11 @@ contract Teller is Ownable, ReentrancyGuard {
      * @dev External function to toggle the teller. This function can be called by only owner.
      */
     function toggleTeller() external onlyOwner {
-        open = !open;
-        closeTime = block.timestamp;
+        if (!(tellerOpen = !tellerOpen)) {
+            tellerClosedTime = block.timestamp;
+        }
 
-        emit TellerToggled(address(this), open);
+        emit TellerToggled(address(this), tellerOpen);
     }
 
     /**
@@ -118,7 +120,7 @@ contract Teller is Ownable, ReentrancyGuard {
      * @param _bonus Amount of bonus
      * @param _days Days of duration
      * @param _penalty Number of penalty
-     * @param _deciAdjustment Adjustment amount
+     * @param _deciAdjustment Decimal percentage
      */
     function addCommitment(
         uint256 _bonus,
@@ -312,8 +314,8 @@ contract Teller is Ownable, ReentrancyGuard {
         Provider memory user = providerInfo[msg.sender];
         uint256 timeGap = block.timestamp - user.lastClaimedTime;
 
-        if (!open) {
-            timeGap = closeTime - user.lastClaimedTime;
+        if (!tellerOpen) {
+            timeGap = tellerClosedTime - user.lastClaimedTime;
         }
 
         if (timeGap > 365 * 1 days) {

@@ -4,11 +4,12 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /**
  * @title Vault Contract
  */
-contract Vault is Ownable {
+contract Vault is Ownable, ReentrancyGuard {
     using Address for address;
 
     /// @notice Event emitted only on construction.
@@ -134,6 +135,19 @@ contract Vault is Ownable {
     function calculateRate() private {
         vidyaRate = Vidya.balanceOf(address(this)) / 26 weeks; // 6 months
         timeToCalculateRate = block.timestamp + 1 weeks;
+
+        emit VidyaRateCalculated(vidyaRate);
+    }
+
+    /**
+     * @dev External function to calculate the Vidya Rate.
+     */
+    function calculateRateExternal() external nonReentrant {
+        require(
+            timeToCalculateRate <= block.timestamp,
+            "Vault: Not time to adjust."
+        );
+        calculateRate();
 
         emit VidyaRateCalculated(vidyaRate);
     }
