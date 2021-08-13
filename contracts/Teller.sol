@@ -331,6 +331,8 @@ contract Teller is Ownable, ReentrancyGuard {
 
     /**
      * @dev Private function to return commit bonus.
+     * @param _commitmentIndex Index of commitment array
+     * @param _amount Commitment token amount
      */
     function commitBonus(uint256 _commitmentIndex, uint256 _amount)
         private
@@ -347,6 +349,10 @@ contract Teller is Ownable, ReentrancyGuard {
 
     /**
      * @dev Private function to calculate the new ending time when the current end time is overflown.
+     * @param _oldAmount Commitment lp token amount which provider has
+     * @param _extraAmount Lp token amount which user wants to commit
+     * @param _oldEndTime Previous commitment ending time
+     * @param _commitmentIndex Index of commitment array
      */
     function calculateNewEndTime(
         uint256 _oldAmount,
