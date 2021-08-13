@@ -27,7 +27,7 @@ interface IVault {
      */
     function payProvider(
         address provider,
-        uint256 providerWeightTime,
+        uint256 providerTimeWeight,
         uint256 totalWeight
     ) external;
 }

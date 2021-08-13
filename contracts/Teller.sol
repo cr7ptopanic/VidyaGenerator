@@ -38,7 +38,7 @@ contract Teller is Ownable, ReentrancyGuard {
 
     /// @notice Event emitted when provider withdrew the lp tokens.
     event Withdrew(address provider, uint256 amount);
-    
+
     /// @notice Event emitted when provider commit the lp tokens.
     event Commited(address provider, uint256 commitedAmount);
 
@@ -56,7 +56,7 @@ contract Teller is Ownable, ReentrancyGuard {
         uint256 userWeight;
         uint256 committedAmount;
         uint256 lastClaimedTime;
-        uint256 commitmentEnds;
+        uint256 commitmentEndTime;
         uint256 commitmentIndex;
     }
     struct Commitment {
@@ -190,11 +190,11 @@ contract Teller is Ownable, ReentrancyGuard {
      * @dev External function to withdraw lp token from providers. This function can be called by only provider.
      * @param _amount LP token amount
      */
-    function withdraw(uint256 _amount) external isProvider {
+    function withdraw(uint256 _amount) external isProvider nonReentrant {
         Provider storage user = providerInfo[msg.sender];
         require(
             user.LPdeposited - user.committedAmount >= _amount,
-            "Teller: Not enough tokens"
+            "Teller: Provider hasn't got enough deposited LP tokens to withdraw."
         );
         claim();
 
@@ -231,38 +231,38 @@ contract Teller is Ownable, ReentrancyGuard {
     {
         require(
             commitmentInfo[_commitmentIndex].isActive,
-            "Teller: Is not a valid commitment"
+            "Teller: Current commitment is not active."
         );
 
         Provider storage user = providerInfo[msg.sender];
 
         require(
             user.LPdeposited - user.committedAmount >= _amount,
-            "Teller: Not enough tokens deposited"
+            "Teller: Provider hasn't got enough deposited LP tokens to commit."
         );
 
         uint256 bonusCredit = commitBonus(_commitmentIndex, _amount);
-        uint256 newEnd;
+        uint256 newEndTime;
 
-        if (user.commitmentEnds > block.timestamp) {
+        if (user.commitmentEndTime > block.timestamp) {
             require(
                 _commitmentIndex == user.commitmentIndex,
-                "Teller: Choose same commitment to extend"
+                "Teller: Current commitment is not same as provider's."
             );
-            newEnd = addToCommitment(
+            newEndTime = calculateNewEndTime(
                 user.committedAmount,
                 _amount,
-                user.commitmentEnds,
+                user.commitmentEndTime,
                 _commitmentIndex
             );
         } else {
-            newEnd =
+            newEndTime =
                 block.timestamp +
                 commitmentInfo[_commitmentIndex].duration;
         }
 
         user.committedAmount += _amount;
-        user.commitmentEnds = newEnd;
+        user.commitmentEndTime = newEndTime;
         user.userWeight += bonusCredit;
         totalWeight += bonusCredit;
 
@@ -277,17 +277,16 @@ contract Teller is Ownable, ReentrancyGuard {
         Provider storage blank;
 
         require(
-            user.commitmentEnds > block.timestamp,
+            user.commitmentEndTime > block.timestamp,
             "Teller: No commitment to break."
         );
 
         uint256 tokenToReceive = user.LPdeposited;
 
+        Commitment memory currentCommit = commitmentInfo[user.commitmentIndex];
 
-        Commitment memory _current = commitmentInfo[user.commitmentIndex];
-
-        uint256 fee = (tokenToReceive * _current.penalty) /
-            _current.deciAdjustment;
+        uint256 fee = (tokenToReceive * currentCommit.penalty) /
+            currentCommit.deciAdjustment;
 
         tokenToReceive -= fee;
 
@@ -309,19 +308,19 @@ contract Teller is Ownable, ReentrancyGuard {
     /**
      * @dev External function to claim the vidya token. This function can be called by only provider and teller must be opened.
      */
-    function claim() external isProvider isTellerOpen nonReentrant {
+    function claim() private {
         Provider memory user = providerInfo[msg.sender];
-        uint256 _timeGap = block.timestamp - user.lastClaimedTime;
+        uint256 timeGap = block.timestamp - user.lastClaimedTime;
 
         if (!open) {
-            _timeGap = closeTime - user.lastClaimedTime;
+            timeGap = closeTime - user.lastClaimedTime;
         }
 
-        if (_timeGap > 365 * 1 days) {
-            _timeGap = 365 * 1 days;
+        if (timeGap > 365 * 1 days) {
+            timeGap = 365 * 1 days;
         }
 
-        uint256 timeWeight = _timeGap * user.userWeight;
+        uint256 timeWeight = timeGap * user.userWeight;
 
         providerInfo[msg.sender].lastClaimedTime = block.timestamp;
 
@@ -347,19 +346,28 @@ contract Teller is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev External function to calim the vidya token. This function can be called by only provider and teller must be opened.
+     * @dev Private function to calculate the new ending time when the current end time is overflown.
      */
-    function addToCommitment(
+    function calculateNewEndTime(
         uint256 _oldAmount,
         uint256 _extraAmount,
-        uint256 _oldEnd,
+        uint256 _oldEndTime,
         uint256 _commitmentIndex
-    ) private returns (uint256) {
-        uint256 _placeHolder = commitmentInfo[_commitmentIndex].duration +
+    ) private view returns (uint256) {
+        uint256 extraEndTIme = commitmentInfo[_commitmentIndex].duration +
             block.timestamp;
-        uint256 newEnd = ((_oldAmount * _oldEnd) +
-            (_extraAmount * _placeHolder)) / (_oldAmount + _extraAmount); //weighted mean formula with amount being the weight
+        uint256 newEndTime = ((_oldAmount * _oldEndTime) +
+            (_extraAmount * extraEndTIme)) / (_oldAmount + _extraAmount);
 
-        return newEnd;
+        return newEndTime;
+    }
+
+    /**
+     * @dev External function to claim the vidya token. This function can be called by only provider and teller must be opened.
+     */
+    function claimExternal() external isTellerOpen isProvider {
+        claim();
+
+        emit Claimed(msg.sender, true);
     }
 }
