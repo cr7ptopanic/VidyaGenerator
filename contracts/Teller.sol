@@ -73,7 +73,6 @@ contract Teller is Ownable, ReentrancyGuard {
     uint256 tellerClosedTime;
 
     mapping(address => Provider) providerInfo;
-    mapping(address => bool) provider;
 
     bool tellerOpen;
     address devAddress;
@@ -87,7 +86,10 @@ contract Teller is Ownable, ReentrancyGuard {
     }
 
     modifier isProvider() {
-        require(provider[msg.sender], "Teller: Caller is not the provider.");
+        require(
+            providerInfo[msg.sender].LPdeposited != 0,
+            "Teller: Caller is not the provider."
+        );
         _;
     }
 
@@ -175,7 +177,7 @@ contract Teller is Ownable, ReentrancyGuard {
         LpToken.transferFrom(msg.sender, address(this), _amount);
 
         Provider storage user = providerInfo[msg.sender];
-        if (provider[msg.sender]) {
+        if (user.LPdeposited != 0) {
             claim();
         } else {
             user.lastClaimedTime = block.timestamp;
@@ -183,7 +185,6 @@ contract Teller is Ownable, ReentrancyGuard {
         user.LPdeposited += _amount;
         user.userWeight += _amount;
         totalLP += _amount;
-        provider[msg.sender] = true;
 
         emit LpDeposited(msg.sender, _amount);
     }
@@ -203,10 +204,6 @@ contract Teller is Ownable, ReentrancyGuard {
         user.userWeight -= ((_amount * user.userWeight) / user.LPdeposited);
 
         user.LPdeposited -= _amount;
-
-        if (user.LPdeposited == 0) {
-            provider[msg.sender] = false;
-        }
 
         uint256 balance = LpToken.balanceOf(address(this));
         uint256 send = _amount;
