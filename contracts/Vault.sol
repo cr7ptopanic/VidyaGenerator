@@ -90,7 +90,7 @@ contract Vault is Ownable, ReentrancyGuard {
         require(_newPriority > 0, "Vault: Priority should be more than zero.");
         require(
             priorityFreeze[_teller] <= block.timestamp,
-            "Vault: Time to change the priority is overflown."
+            "Vault: Not time to change the priority."
         );
 
         uint256 _oldPriority = tellerPriority[_teller];

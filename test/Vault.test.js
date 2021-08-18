@@ -44,7 +44,7 @@ contract("Vault", (accounts) => {
             try {
                 await vault_contract.addTeller(
                     "0x85f1d204292416DcBfB5F47CF708Ec06fFbA47d2",
-                    123, 
+                    123,
                     { from: accounts[0] }
                 );
             } catch (error) {
@@ -62,7 +62,7 @@ contract("Vault", (accounts) => {
             try {
                 await vault_contract.addTeller(
                     vidya_contract.address,
-                    0, 
+                    0,
                     { from: accounts[0] }
                 );
             } catch (error) {
@@ -84,7 +84,7 @@ contract("Vault", (accounts) => {
             try {
                 await vault_contract.addTeller(
                     teller_contract.address,
-                    10, 
+                    10,
                     { from: accounts[0] }
                 );
             } catch (error) {
@@ -104,7 +104,7 @@ contract("Vault", (accounts) => {
             try {
                 await vault_contract.changePriority(
                     "0x85f1d204292416DcBfB5F47CF708Ec06fFbA47d2",
-                    123, 
+                    123,
                     { from: accounts[0] }
                 );
             } catch (error) {
@@ -120,9 +120,9 @@ contract("Vault", (accounts) => {
         it("Caller is not the teller.", async () => {
             let thrownError;
             try {
-                await changePriority.addTeller(
+                await vault_contract.changePriority(
                     vidya_contract.address,
-                    10, 
+                    10,
                     { from: accounts[0] }
                 );
             } catch (error) {
@@ -135,12 +135,12 @@ contract("Vault", (accounts) => {
             )
         });
 
-        it("Not time to change priority", async () => {
+        it("New priority should be more than zero", async () => {
             let thrownError;
             try {
-                await vault_contract.addTeller(
+                await vault_contract.changePriority(
                     teller_contract.address,
-                    10, 
+                    0,
                     { from: accounts[0] }
                 );
             } catch (error) {
@@ -149,12 +149,31 @@ contract("Vault", (accounts) => {
 
             assert.include(
                 thrownError.message,
-                'Vault: Caller is a teller already.',
+                'Vault: Priority should be more than zero.',
             )
         });
 
-        it("Adding Teller is working", async () => {
-            await vault_contract.addTeller(teller_contract.address, 10);
+        it("Not time to change priority", async () => {
+            let thrownError;
+            try {
+                await vault_contract.changePriority(
+                    teller_contract.address,
+                    20,
+                    { from: accounts[0] }
+                );
+            } catch (error) {
+                thrownError = error;
+            }
+
+            assert.include(
+                thrownError.message,
+                'Vault: Not time to change the priority.',
+            )
+        });
+
+        it("Change priority is working", async () => {
+            await timeMachine.advanceTimeAndBlock(604800);
+            await vault_contract.changePriority(teller_contract.address, 7);
         });
 
     });
