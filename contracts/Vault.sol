@@ -5,12 +5,14 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title Vault Contract
  */
 contract Vault is Ownable, ReentrancyGuard {
     using Address for address;
+    using SafeERC20 for IERC20;
 
     /// @notice Event emitted only on construction.
     event VaultDeployed();
@@ -125,7 +127,7 @@ contract Vault is Ownable, ReentrancyGuard {
             calculateRate();
         }
 
-        Vidya.transfer(_provider, amount);
+        Vidya.safeTransfer(_provider, amount);
 
         emit ProviderPaid(_provider, amount);
     }

@@ -174,7 +174,7 @@ contract Teller is Ownable, ReentrancyGuard {
      * @param _amount LP token amount
      */
     function depositLP(uint256 _amount) external isTellerOpen {
-        LpToken.transferFrom(msg.sender, address(this), _amount);
+        LpToken.safeTransferFrom(msg.sender, address(this), _amount);
 
         Provider storage user = providerInfo[msg.sender];
         if (user.LPdeposited != 0) {
@@ -213,7 +213,7 @@ contract Teller is Ownable, ReentrancyGuard {
         }
 
         totalLP -= send;
-        LpToken.transfer(msg.sender, send);
+        LpToken.safeTransfer(msg.sender, send);
 
         emit Withdrew(msg.sender, send);
     }
@@ -296,10 +296,10 @@ contract Teller is Ownable, ReentrancyGuard {
         user = blank;
 
         if (purpose) {
-            LpToken.transfer(devAddress, fee / 10);
+            LpToken.safeTransfer(devAddress, fee / 10);
         }
 
-        LpToken.transfer(msg.sender, tokenToReceive);
+        LpToken.safeTransfer(msg.sender, tokenToReceive);
 
         emit CommitmentBroke(msg.sender, tokenToReceive);
     }
