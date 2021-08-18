@@ -87,6 +87,7 @@ contract Vault is Ownable, ReentrancyGuard {
             "Vault: Address is not the contract address."
         );
         require(teller[_teller], "Vault: Caller is not the teller.");
+        require(_newPriority > 0, "Vault: Priority should be more than zero.");
         require(
             priorityFreeze[_teller] <= block.timestamp,
             "Vault: Time to change the priority is overflown."
