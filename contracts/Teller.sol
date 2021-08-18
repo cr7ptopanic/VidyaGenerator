@@ -149,7 +149,7 @@ contract Teller is Ownable, ReentrancyGuard {
      */
     function toggleCommitment(uint256 _index) external onlyOwner {
         require(
-            0 < _index && _index <= commitmentInfo.length,
+            0 < _index && _index < commitmentInfo.length,
             "Teller: Current index is not listed in the commitment array."
         );
 

@@ -3,7 +3,6 @@ const Vidya = artifacts.require("Vidya");
 const Teller = artifacts.require("Teller");
 const Lptoken = artifacts.require("Lptoken");
 const { assert } = require("chai");
-const { BN } = require("web3-utils");
 const timeMachine = require('ganache-time-traveler');
 
 contract("Vault", (accounts) => {
