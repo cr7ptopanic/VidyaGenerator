@@ -217,7 +217,7 @@ contract Teller is Ownable, ReentrancyGuard {
         uint256 _weightChange = (_amount * user.userWeight) / userTokens;
         user.userWeight -= _weightChange;
         totalWeight -= _weightChange;
-        
+
         uint256 oldRatio = user.LPDepositedRatio;
         uint256 newRatio = ((userTokens - _amount) * (totalLP - oldRatio)) /
             (contractBalance - _amount);
@@ -246,25 +246,10 @@ contract Teller is Ownable, ReentrancyGuard {
         );
 
         Provider storage user = providerInfo[msg.sender];
-        if (user.commitmentEndTime <= block.timestamp) {
-            user.committedAmount = 0;
-            user.commitmentIndex = 0;
-        }
-        uint256 contractBalance = LpToken.balanceOf(address(this));
-        uint256 userTokens = (user.LPDepositedRatio * contractBalance) /
-            totalLP;
 
-        require(
-            userTokens - user.committedAmount >= _amount,
-            "Teller: Provider hasn't got enough deposited LP tokens to commit."
-        );
-
-        uint256 weigthToGain = (_amount * user.userWeight) / userTokens;
-
-        uint256 bonusCredit = commitBonus(_commitmentIndex, weigthToGain);
         uint256 newEndTime;
 
-        if (user.commitmentEndTime > block.timestamp) {
+        if (user.commitmentEndTime <= block.timestamp) {
             require(
                 _commitmentIndex == user.commitmentIndex,
                 "Teller: Current commitment is not same as provider's."
@@ -276,12 +261,27 @@ contract Teller is Ownable, ReentrancyGuard {
                 _commitmentIndex
             );
         } else {
+            user.committedAmount = 0;
+            user.commitmentIndex = 0;
             newEndTime =
                 block.timestamp +
                 commitmentInfo[_commitmentIndex].duration;
         }
+
+        uint256 contractBalance = LpToken.balanceOf(address(this));
+        uint256 userTokens = (user.LPDepositedRatio * contractBalance) /
+            totalLP;
+
+        require(
+            userTokens - user.committedAmount >= _amount,
+            "Teller: Provider hasn't got enough deposited LP tokens to commit."
+        );
+
+        uint256 weigthToGain = (_amount * user.userWeight) / userTokens;
+        uint256 bonusCredit = commitBonus(_commitmentIndex, weigthToGain);
+
         claim();
-        user.commitIndex = _commitmentIndex;
+        user.commitmentIndex = _commitmentIndex;
         user.committedAmount += _amount;
         user.commitmentEndTime = newEndTime;
         user.userWeight += bonusCredit;
