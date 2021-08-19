@@ -187,7 +187,6 @@ contract Teller is Ownable, ReentrancyGuard {
         }
         if (contractBalance == totalLP) {
             user.LPDepositedRatio += _amount;
-
             totalLP += _amount;
         } else {
             uint256 _adjustedAmount = (_amount * totalLP) / contractBalance;
@@ -293,8 +292,7 @@ contract Teller is Ownable, ReentrancyGuard {
      * @dev External function to break the commitment. This function can be called by only provider.
      */
     function breakCommitment() external nonReentrant isProvider {
-        Provider storage user = providerInfo[msg.sender];
-        Provider storage blank;
+        Provider memory user = providerInfo[msg.sender];
 
         require(
             user.commitmentEndTime > block.timestamp,
@@ -317,7 +315,7 @@ contract Teller is Ownable, ReentrancyGuard {
 
         totalWeight -= user.userWeight;
 
-        user = blank;
+        delete providerInfo[msg.sender];
 
         if (purpose) {
             LpToken.safeTransfer(devAddress, fee / 10);
