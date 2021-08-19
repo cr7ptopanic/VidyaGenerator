@@ -1,6 +1,5 @@
 const HDWalletProvider = require("@truffle/hdwallet-provider");
 const secretKovan = require("./secret.kovan.json");
-const secretMumbai = require("./secret.mumbai.json");
 
 module.exports = {
   // Uncommenting the defaults below
@@ -19,13 +18,6 @@ module.exports = {
       network_id: 42,
       timeoutBlocks: 50000,
       skipDryRun: true,
-    },
-    matic: {
-      provider: () => new HDWalletProvider(secretMumbai.mnemonic, `https://rpc-mumbai.maticvigil.com`),
-      network_id: 80001,
-      confirmations: 2,
-      timeoutBlocks: 5000,
-      skipDryRun: true
     },
   },
   compilers: {
