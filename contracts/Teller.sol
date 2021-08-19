@@ -244,10 +244,10 @@ contract Teller is Ownable, ReentrancyGuard {
             commitmentInfo[_commitmentIndex].isActive,
             "Teller: Current commitment is not active."
         );
-        
+
         Provider storage user = providerInfo[msg.sender];
 
-        if(user.committedAmount != 0) {
+        if (user.committedAmount != 0) {
             require(
                 _commitmentIndex == user.commitmentIndex,
                 "Teller: Current commitment is not same as provider's."
@@ -256,7 +256,10 @@ contract Teller is Ownable, ReentrancyGuard {
 
         uint256 newEndTime;
 
-        if (user.commitmentEndTime <= block.timestamp && user.committedAmount != 0) {
+        if (
+            user.commitmentEndTime >= block.timestamp &&
+            user.committedAmount != 0
+        ) {
             newEndTime = calculateNewEndTime(
                 user.committedAmount,
                 _amount,
