@@ -54,7 +54,7 @@ contract Teller is Ownable, ReentrancyGuard {
     IERC20 LpToken;
 
     struct Provider {
-        uint256 LPdeposited;
+        uint256 LPDepositedRatio;
         uint256 userWeight;
         uint256 lastClaimedTime;
         uint256 commitmentIndex;
@@ -89,7 +89,7 @@ contract Teller is Ownable, ReentrancyGuard {
 
     modifier isProvider() {
         require(
-            providerInfo[msg.sender].LPdeposited != 0,
+            providerInfo[msg.sender].LPDepositedRatio != 0,
             "Teller: Caller is not the provider."
         );
         _;
@@ -101,8 +101,8 @@ contract Teller is Ownable, ReentrancyGuard {
      * @param _Vault Interface of Vault
      */
     constructor(IERC20 _LpToken, IVault _Vault) {
-        LpToken = _LpToken;
         Vault = _Vault;
+        LpToken = _LpToken;
         commitmentInfo.push();
 
         emit TellerDeployed();
@@ -176,17 +176,27 @@ contract Teller is Ownable, ReentrancyGuard {
      * @param _amount LP token amount
      */
     function depositLP(uint256 _amount) external isTellerOpen {
+        uint256 contractBalance = LpToken.balanceOf(address(this));
         LpToken.safeTransferFrom(msg.sender, address(this), _amount);
 
         Provider storage user = providerInfo[msg.sender];
-        if (user.LPdeposited != 0) {
+        if (user.LPDepositedRatio != 0) {
             claim();
         } else {
             user.lastClaimedTime = block.timestamp;
         }
-        user.LPdeposited += _amount;
-        user.userWeight += _amount;
+        if(contractBalance == totalLP){           
+        user.LPDepositedRatio += _amount;
+
         totalLP += _amount;
+        }else{
+            uint256 _adjustedAmount = amount * total / contractBalance;
+            user.LPDepositedRatio += _adjustedAmount;
+            totalLP += _adjustedAmount;
+        }
+
+        user.userWeight += _amount;
+        totalWeight += _amount;
 
         emit LpDeposited(msg.sender, _amount);
     }
@@ -197,24 +207,20 @@ contract Teller is Ownable, ReentrancyGuard {
      */
     function withdraw(uint256 _amount) external isProvider nonReentrant {
         Provider storage user = providerInfo[msg.sender];
+        uint256 contractBalance =LpToken.balanceOf(address(this));
+        uint256 userTokens = (user.LPDepositedRatio * contractBalance) / totalLP;
         require(
-            user.LPdeposited - user.committedAmount >= _amount,
+            ( userTokens - user.committedAmount >= _amount,
             "Teller: Provider hasn't got enough deposited LP tokens to withdraw."
         );
         claim();
 
-        user.userWeight -= ((_amount * user.userWeight) / user.LPdeposited);
+        user.userWeight -= ((_amount * user.userWeight) / userTokens);
+        uint256 oldRatio = user.LPDepositedRatio;
+        uint256 newRatio = (userTokens - _amount) * (totalLP - oldRatio) / (contractBalance - amount) 
+        totalLP = (totalLP - oldRatio) + newRatio;
+        user.LPDepositedRatio = newRatio;
 
-        user.LPdeposited -= _amount;
-
-        uint256 balance = LpToken.balanceOf(address(this));
-        uint256 send = _amount;
-
-        if (totalLP < balance) {
-            send = (_amount * balance) / totalLP;
-        }
-
-        totalLP -= send;
         LpToken.safeTransfer(msg.sender, send);
 
         emit Withdrew(msg.sender, send);
@@ -236,13 +242,21 @@ contract Teller is Ownable, ReentrancyGuard {
         );
 
         Provider storage user = providerInfo[msg.sender];
+        if(user.commitmentEndTime <= block.timestamp){
+            user.committedAmount = 0;
+            user.commitmentIndex = 0;
+        }
+        uint256 contractBalance = LpToken.balanceOf(address(this));
+        uint256 userTokens = (user.LPDepositedRatio * contractBalance) / totalLP;
 
         require(
-            user.LPdeposited - user.committedAmount >= _amount,
+            userTokens - user.committedAmount >= _amount,
             "Teller: Provider hasn't got enough deposited LP tokens to commit."
         );
 
-        uint256 bonusCredit = commitBonus(_commitmentIndex, _amount);
+        uint256 weigthToGain = (_amount*user.userWeight) / userTokens
+
+        uint256 bonusCredit = commitBonus(_commitmentIndex, weigthToGain);
         uint256 newEndTime;
 
         if (user.commitmentEndTime > block.timestamp) {
@@ -261,7 +275,7 @@ contract Teller is Ownable, ReentrancyGuard {
                 block.timestamp +
                 commitmentInfo[_commitmentIndex].duration;
         }
-
+        claim();
         user.committedAmount += _amount;
         user.commitmentEndTime = newEndTime;
         user.userWeight += bonusCredit;
@@ -282,7 +296,9 @@ contract Teller is Ownable, ReentrancyGuard {
             "Teller: No commitment to break."
         );
 
-        uint256 tokenToReceive = user.LPdeposited;
+        uint256 contractBalance =LpToken.balanceOf(address(this));
+
+        uint256 tokenToReceive = (user.LPDepositedRatio * contractBalance) / totalLP;
 
         Commitment memory currentCommit = commitmentInfo[user.commitmentIndex];
 
@@ -291,7 +307,7 @@ contract Teller is Ownable, ReentrancyGuard {
 
         tokenToReceive -= fee;
 
-        totalLP -= user.LPdeposited;
+        totalLP -= user.LPDepositedRatio;
 
         totalWeight -= user.userWeight;
 
@@ -310,7 +326,15 @@ contract Teller is Ownable, ReentrancyGuard {
      * @dev External function to claim the vidya token. This function can be called by only provider and teller must be opened.
      */
     function claim() private {
-        Provider memory user = providerInfo[msg.sender];
+        
+        Provider storage user = providerInfo[msg.sender];
+        //Determines if commitment is over, added here since claim is called in every function.
+        if(user.commitmentEndTime <= block.timestamp){
+            user.committedAmount = 0;
+            user.commitmentIndex = 0;
+        }
+
+
         uint256 timeGap = block.timestamp - user.lastClaimedTime;
 
         if (!tellerOpen) {
@@ -374,7 +398,16 @@ contract Teller is Ownable, ReentrancyGuard {
      */
     function claimExternal() external isTellerOpen isProvider {
         claim();
-
-        emit Claimed(msg.sender, true);
     }
+
+    /**
+     * @dev External function used to view user LpTokens owned. 
+     */
+
+    function userLPTokens() external view return(uint256){
+
+        return providerInfo[msg.sender].LPDepositedRatio * LpToken.balanceOf(address(this))) / totalLP;
+
+    }
+
 }
