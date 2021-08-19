@@ -94,12 +94,63 @@ contract("Teller", (accounts) => {
 
         it("Depositing LP token is working", async () => {
             await teller_contract.toggleTeller({ from: accounts[0] });
+            await teller_contract.depositLP(new BN('1000000000000000000000'), { from: accounts[2] }); // Deposit LP token: 1,000
+            await teller_contract.depositLP(new BN('1000000000000000000000'), { from: accounts[2] }); // Deposit LP token: 1,000
             await teller_contract.depositLP(new BN('1000000000000000000000'), { from: accounts[1] }); // Deposit LP token: 1,000
-            assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('1000000000000000000000').toString());
 
-            await timeMachine.advanceTimeAndBlock(604800);
-            await teller_contract.depositLP(new BN('1000000000000000000000'), { from: accounts[1] }); // Deposit LP token: 1,000
-            assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('2000000000000000000000').toString());
+            assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('3000000000000000000000').toString());
         });
+    });
+
+    describe("Commit", () => {
+        it("Current Commit is not active.", async () => {
+            let thrownError;
+            try {
+                await teller_contract.toggleCommitment(1);
+                await teller_contract.commit(new BN('100000000000000000000'), 1,  { from: accounts[1] });
+            } catch (error) {
+                thrownError = error;
+            }
+
+            assert.include(
+                thrownError.message,
+                'Teller: Current commitment is not active.',
+            )
+        });
+
+        it("Provider hasn't got enough deposited LP tokens to commit.", async () => {
+            await teller_contract.toggleCommitment(1);
+            await teller_contract.commit(new BN('100000000000000000000'), 1,  { from: accounts[1] });
+            let thrownError;
+            try {
+                await teller_contract.commit(new BN('1000000000000000000000'), 1,  { from: accounts[1] });
+            } catch (error) {
+                thrownError = error;
+            }
+
+            assert.include(
+                thrownError.message,
+                "Teller: Provider hasn't got enough deposited LP tokens to commit.",
+            )
+        });
+
+        // it("Current commitment is not same as provider's.", async () => {
+        //     let thrownError;
+        //     try {
+        //         await teller_contract.commit(new BN('1000000000000000000000'), 3,  { from: accounts[1] });
+        //     } catch (error) {
+        //         thrownError = error;
+        //     }
+
+        //     assert.include(
+        //         thrownError.message,
+        //         "Teller: Current commitment is not same as provider's.",
+        //     )
+        // });
+
+        // it("Commit is working.", async () => {
+        //     await teller_contract.commit(new BN('100000000000000000000'), 1, { from: accounts[1] }); // Deposit LP token: 100
+        //     assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('3000000000000000000000').toString());
+        // });
     });
 });
