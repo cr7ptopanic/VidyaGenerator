@@ -280,8 +280,8 @@ contract Teller is Ownable, ReentrancyGuard {
             "Teller: Provider hasn't got enough deposited LP tokens to commit."
         );
 
-        uint256 weigthToGain = (_amount * user.userWeight) / userTokens;
-        uint256 bonusCredit = commitBonus(_commitmentIndex, weigthToGain);
+        uint256 weightToGain = (_amount * user.userWeight) / userTokens;
+        uint256 bonusCredit = commitBonus(_commitmentIndex, weightToGain);
 
         claim();
         user.commitmentIndex = _commitmentIndex;
