@@ -201,7 +201,7 @@ contract Teller is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev External function to withdraw lp token from providers. This function can be called by only provider.
+     * @dev External function to withdraw lp token from the teller. This function can be called by only provider.
      * @param _amount LP token amount
      */
     function withdraw(uint256 _amount) external isProvider nonReentrant {
@@ -250,7 +250,7 @@ contract Teller is Ownable, ReentrancyGuard {
         if (user.committedAmount != 0) {
             require(
                 _commitmentIndex == user.commitmentIndex,
-                "Teller: Current commitment is not same as provider's."
+                "Teller: Current commitment is not same as provider."
             );
         }
 

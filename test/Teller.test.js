@@ -107,7 +107,7 @@ contract("Teller", (accounts) => {
             let thrownError;
             try {
                 await teller_contract.toggleCommitment(1);
-                await teller_contract.commit(new BN('100000000000000000000'), 1,  { from: accounts[1] });
+                await teller_contract.commit(new BN('100000000000000000000'), 1, { from: accounts[1] });
             } catch (error) {
                 thrownError = error;
             }
@@ -120,10 +120,10 @@ contract("Teller", (accounts) => {
 
         it("Provider hasn't got enough deposited LP tokens to commit.", async () => {
             await teller_contract.toggleCommitment(1);
-            await teller_contract.commit(new BN('100000000000000000000'), 1,  { from: accounts[1] });
+            await teller_contract.commit(new BN('100000000000000000000'), 1, { from: accounts[1] });
             let thrownError;
             try {
-                await teller_contract.commit(new BN('1000000000000000000000'), 1,  { from: accounts[1] });
+                await teller_contract.commit(new BN('1000000000000000000000'), 1, { from: accounts[1] });
             } catch (error) {
                 thrownError = error;
             }
@@ -134,23 +134,79 @@ contract("Teller", (accounts) => {
             )
         });
 
-        // it("Current commitment is not same as provider's.", async () => {
-        //     let thrownError;
-        //     try {
-        //         await teller_contract.commit(new BN('1000000000000000000000'), 3,  { from: accounts[1] });
-        //     } catch (error) {
-        //         thrownError = error;
-        //     }
+        it("Commit is working.", async () => {
+            await teller_contract.commit(new BN('100000000000000000000'), 1, { from: accounts[1] }); // Deposit LP token: 100
+            await teller_contract.commit(new BN('300000000000000000000'), 2, { from: accounts[2] }); // Deposit LP token: 300
+            await teller_contract.commit(new BN('100000000000000000000'), 1, { from: accounts[1] }); // Deposit LP token: 100
+            await teller_contract.withdraw(new BN('500000000000000000000'), { from: accounts[1] }); // Withdraw 500
 
-        //     assert.include(
-        //         thrownError.message,
-        //         "Teller: Current commitment is not same as provider's.",
-        //     )
-        // });
+            assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('2500000000000000000000').toString());
+        });
 
-        // it("Commit is working.", async () => {
-        //     await teller_contract.commit(new BN('100000000000000000000'), 1, { from: accounts[1] }); // Deposit LP token: 100
-        //     assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('3000000000000000000000').toString());
-        // });
+        it("Current commitment is not same as provider's.", async () => {
+            let thrownError;
+            try {
+                await teller_contract.commit(new BN('1000000000000000000000'), 2, { from: accounts[1] });
+            } catch (error) {
+                thrownError = error;
+            }
+
+            assert.include(
+                thrownError.message,
+                "Teller: Current commitment is not same as provider.",
+            )
+        });
+
+    });
+
+    describe("Break Commitment", () => {
+        it("Break commitment is working.", async () => {
+            await teller_contract.breakCommitment({ from: accounts[1] }); // Deposit LP token: 100
+            assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('2125000000000000000000').toString());
+            assert.equal(new BN(await lptoken_contract.balanceOf(accounts[1])).toString(), new BN('9875000000000000000000').toString());
+        });
+
+        it("No commitment to break", async () => {
+            await teller_contract.depositLP(new BN('1000000000000000000000'), { from: accounts[1] }); // Deposit LP token: 1,000
+            await teller_contract.commit(new BN('100000000000000000000'), 1, { from: accounts[1] }); // Deposit LP token: 100
+            await timeMachine.advanceTimeAndBlock(604800);
+            let thrownError;
+            try {
+                await teller_contract.breakCommitment({ from: accounts[1] });
+            } catch (error) {
+                thrownError = error;
+            }
+
+            assert.include(
+                thrownError.message,
+                "Teller: No commitment to break.",
+            )
+        });
+    });
+
+    describe("Withdraw", () => {
+        it("Provider hasn't got enough deposited LP tokens to withdraw.", async () => {
+            await teller_contract.commit(new BN('100000000000000000000'), 1, { from: accounts[1] }); // Deposit LP token: 100
+            let thrownError;
+            try {
+                await teller_contract.withdraw(new BN('10000000000000000000000'), { from: accounts[1] });
+            } catch (error) {
+                thrownError = error;
+            }
+
+            assert.include(
+                thrownError.message,
+                "Teller: Provider hasn't got enough deposited LP tokens to withdraw.",
+            )
+        });
+
+        it("Withdraw is working.", async () => {
+            await timeMachine.advanceTimeAndBlock(605000);
+            assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('3125000000000000000000').toString());
+            assert.equal(new BN(await lptoken_contract.balanceOf(accounts[1])).toString(), new BN('8875000000000000000000').toString());
+            await teller_contract.withdraw(new BN('500000000000000000000'), { from: accounts[1] }); // Deposit LP token: 500
+            assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('2625000000000000000000').toString());
+            assert.equal(new BN(await lptoken_contract.balanceOf(accounts[1])).toString(), new BN('9375000000000000000000').toString());
+        });
     });
 });
