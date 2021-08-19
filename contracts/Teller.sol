@@ -101,8 +101,8 @@ contract Teller is Ownable, ReentrancyGuard {
      * @param _Vault Interface of Vault
      */
     constructor(IERC20 _LpToken, IVault _Vault) {
-        Vault = _Vault;
         LpToken = _LpToken;
+        Vault = _Vault;
         commitmentInfo.push();
 
         emit TellerDeployed();

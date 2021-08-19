@@ -31,7 +31,7 @@ contract("Teller", (accounts) => {
 
         await Teller.new(
             lptoken_contract.address,
-            vidya_contract.address,
+            vault_contract.address,
             { from: accounts[0] }
         ).then((instance) => {
             teller_contract = instance;

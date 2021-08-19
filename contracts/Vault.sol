@@ -121,7 +121,10 @@ contract Vault is Ownable, ReentrancyGuard {
 
         uint256 denominator = _totalWeight * totalPriority;
 
-        uint256 amount = numerator / denominator;
+        uint256 amount = 0;
+        if (denominator != 0) {
+            amount = numerator / denominator;
+        }
 
         if (timeToCalculateRate <= block.timestamp) {
             calculateRate();
