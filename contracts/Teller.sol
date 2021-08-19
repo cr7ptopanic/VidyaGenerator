@@ -249,7 +249,7 @@ contract Teller is Ownable, ReentrancyGuard {
 
         uint256 newEndTime;
 
-        if (user.commitmentEndTime <= block.timestamp) {
+        if (user.commitmentEndTime <= block.timestamp && user.committedAmount != 0) {
             require(
                 _commitmentIndex == user.commitmentIndex,
                 "Teller: Current commitment is not same as provider's."
