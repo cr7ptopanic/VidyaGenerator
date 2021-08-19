@@ -281,6 +281,7 @@ contract Teller is Ownable, ReentrancyGuard {
                 commitmentInfo[_commitmentIndex].duration;
         }
         claim();
+        user.commitIndex = _commitmentIndex;
         user.committedAmount += _amount;
         user.commitmentEndTime = newEndTime;
         user.userWeight += bonusCredit;
