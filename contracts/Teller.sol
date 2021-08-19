@@ -214,9 +214,10 @@ contract Teller is Ownable, ReentrancyGuard {
             "Teller: Provider hasn't got enough deposited LP tokens to withdraw."
         );
         claim();
-
-        user.userWeight -= ((_amount * user.userWeight) / userTokens);
-
+        uint256 _weightChange = (_amount * user.userWeight) / userTokens;
+        user.userWeight -= _weightChange;
+        totalWeight -= _weightChange;
+        
         uint256 oldRatio = user.LPDepositedRatio;
         uint256 newRatio = ((userTokens - _amount) * (totalLP - oldRatio)) /
             (contractBalance - _amount);
