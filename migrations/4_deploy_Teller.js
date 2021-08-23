@@ -9,8 +9,8 @@ module.exports = async function (deployer) {
 
   await deployer.deploy(
     Teller,
-    Lptoken_instance.adress,
-    Vault_instance.adress
+    Lptoken_instance.address,
+    Vault_instance.address
   );
   return;
 };

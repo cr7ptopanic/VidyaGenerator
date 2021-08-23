@@ -7,7 +7,7 @@ module.exports = async function (deployer) {
 
   await deployer.deploy(
     Vault,
-    Vidya_instance.adress
+    Vidya_instance.address
   );
   return;
 };

@@ -162,8 +162,8 @@ contract("Teller", (accounts) => {
     describe("Break Commitment", () => {
         it("Break commitment is working.", async () => {
             await teller_contract.breakCommitment({ from: accounts[1] }); // Deposit LP token: 100
-            assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('2125000000000000000000').toString());
-            assert.equal(new BN(await lptoken_contract.balanceOf(accounts[1])).toString(), new BN('9875000000000000000000').toString());
+            assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('2113333333333333333334').toString());
+            assert.equal(new BN(await lptoken_contract.balanceOf(accounts[1])).toString(), new BN('9886666666666666666666').toString());
         });
 
         it("No commitment to break", async () => {
@@ -202,11 +202,11 @@ contract("Teller", (accounts) => {
 
         it("Withdraw is working.", async () => {
             await timeMachine.advanceTimeAndBlock(605000);
-            assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('3125000000000000000000').toString());
-            assert.equal(new BN(await lptoken_contract.balanceOf(accounts[1])).toString(), new BN('8875000000000000000000').toString());
+            assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('3113333333333333333334').toString());
+            assert.equal(new BN(await lptoken_contract.balanceOf(accounts[1])).toString(), new BN('8886666666666666666666').toString());
             await teller_contract.withdraw(new BN('500000000000000000000'), { from: accounts[1] }); // Deposit LP token: 500
-            assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('2625000000000000000000').toString());
-            assert.equal(new BN(await lptoken_contract.balanceOf(accounts[1])).toString(), new BN('9375000000000000000000').toString());
+            assert.equal(new BN(await lptoken_contract.balanceOf(teller_contract.address)).toString(), new BN('2613333333333333333334').toString());
+            assert.equal(new BN(await lptoken_contract.balanceOf(accounts[1])).toString(), new BN('9386666666666666666666').toString());
         });
     });
 });

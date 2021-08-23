@@ -314,7 +314,7 @@ contract Teller is Ownable, ReentrancyGuard {
 
         Commitment memory currentCommit = commitmentInfo[user.commitmentIndex];
 
-        uint256 fee = (user.commitedAmount * currentCommit.penalty) /
+        uint256 fee = (user.committedAmount * currentCommit.penalty) /
             currentCommit.deciAdjustment;
 
         tokenToReceive -= fee;
